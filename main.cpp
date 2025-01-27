@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <ctime>
 #include <iostream>
+#include <cmath>  // Add this line for sqrt function
 
 // Constants for map dimensions and tile size
 const int MAP_WIDTH = 20;
@@ -77,13 +78,15 @@ void drawInventory(sf::RenderWindow& window, sf::View& hudView) {
 int main() {
     // Create the game window (resizeable)
     sf::RenderWindow window(sf::VideoMode(800, 600), "Player and NPC Animations", sf::Style::Resize);
+    sf::Vector2f npcVelocity(0.f, 0.f); // Initial NPC velocity (no movement)
 
     // Load textures for tiles and player/NPC
-    sf::Texture grassTexture, waterTexture, playerTexture, npcTexture;
+    sf::Texture grassTexture, waterTexture, playerTexture, npcTexture, footballTexture;
     if (!grassTexture.loadFromFile("grass.png") ||
         !waterTexture.loadFromFile("water.png") ||
         !playerTexture.loadFromFile("player_spritesheet.png") ||
-        !npcTexture.loadFromFile("npc_spritesheet.png")) { // NPC spritesheet
+        !npcTexture.loadFromFile("npc_spritesheet.png") ||
+        !footballTexture.loadFromFile("football.png")) { // Football texture
         std::cerr << "Error: Failed to load textures." << std::endl;
         return -1;
     }
@@ -103,16 +106,25 @@ int main() {
     sf::Sprite npcSprite(npcTexture);
     npcSprite.setOrigin(TILE_SIZE / 2, TILE_SIZE / 2); // Set the origin to the center of the sprite
     sf::Vector2f npcPosition(100.f, 100.f); // Initial NPC position
-    sf::Vector2f npcVelocity(0.f, 0.f); // Initial NPC velocity
-    int npcCurrentFrame = 0;
-    int npcAnimationRow = 1;
+
+    // Create the football sprite
+    sf::Sprite footballSprite(footballTexture);
+    footballSprite.setOrigin(footballTexture.getSize().x / 2.f, footballTexture.getSize().y / 2.f);
+
+    // Football variables
+    bool isThrowing = false;
+    sf::Vector2f footballPosition;
+    sf::Vector2f footballVelocity;
+    sf::Clock footballTimer; // Timer for the football animation and movement
 
     // Animation setup
     sf::Clock playerAnimationClock;
-    sf::Clock npcAnimationClock;
+    sf::Clock npcAnimationClock;  // Timer for NPC animation
     sf::Clock movementClock;
     int playerCurrentFrame = 0;
     int playerAnimationRow = 1;
+    int npcCurrentFrame = 0;
+    int npcAnimationRow = 1;
 
     // Generate the world map
     std::vector<std::vector<TileType>> world = generateWorld();
@@ -157,11 +169,34 @@ int main() {
             velocity.x = 0.f;
         }
 
+        // Handle space bar press to throw football
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Space) && !isThrowing) {
+            isThrowing = true;
+            footballPosition = playerPosition; // Set initial position to player
+            sf::Vector2f direction = npcPosition - playerPosition; // Direction to NPC
+            float length = sqrt(direction.x * direction.x + direction.y * direction.y);
+            direction /= length; // Normalize direction
+            float throwSpeed = 300.0f; // Speed of the football throw
+            footballVelocity = direction * throwSpeed; // Set football velocity
+            footballTimer.restart(); // Restart the football timer
+        }
+
         // Update player position
         sf::Time deltaTime = movementClock.restart();
         playerPosition += velocity * deltaTime.asSeconds();
 
-        // Player animation
+        // Football movement
+        if (isThrowing) {
+            footballPosition += footballVelocity * deltaTime.asSeconds();
+
+            // Check for collision with NPC (simple distance check)
+            if (sqrt(pow(footballPosition.x - npcPosition.x, 2) + pow(footballPosition.y - npcPosition.y, 2)) < TILE_SIZE) {
+                std::cout << "Football hit the NPC!" << std::endl;
+                isThrowing = false; // Reset the throw
+            }
+        }
+
+        // Update player animation (show only the current frame)
         if (velocity.x == 0.f && velocity.y == 0.f) {
             playerCurrentFrame = 0;
         } else if (playerAnimationClock.getElapsedTime().asSeconds() > 0.15f) {
@@ -169,60 +204,56 @@ int main() {
             playerAnimationClock.restart();
         }
 
-        sf::IntRect playerFrame(playerCurrentFrame * TILE_SIZE, (playerAnimationRow - 1) * TILE_SIZE, TILE_SIZE, TILE_SIZE);
-        playerSprite.setTextureRect(playerFrame);
-
-        // NPC movement logic: Move in a random direction at intervals
-        if (npcMovementClock.getElapsedTime().asSeconds() > npcMoveInterval) {
-            // Choose a random direction for the NPC
-            int randomDirection = rand() % 4; // 0 = up, 1 = down, 2 = left, 3 = right
-            float npcSpeed = 50.0f; // NPC speed
-
-            if (randomDirection == 0 && npcPosition.y > 0) { // Move up
-                npcVelocity = sf::Vector2f(0.f, -npcSpeed);
-                npcAnimationRow = 2;
-            } else if (randomDirection == 1 && npcPosition.y < MAP_HEIGHT * TILE_SIZE - TILE_SIZE) { // Move down
-                npcVelocity = sf::Vector2f(0.f, npcSpeed);
-                npcAnimationRow = 1;
-            } else if (randomDirection == 2 && npcPosition.x > 0) { // Move left
-                npcVelocity = sf::Vector2f(-npcSpeed, 0.f);
-                npcAnimationRow = 3;
-            } else if (randomDirection == 3 && npcPosition.x < MAP_WIDTH * TILE_SIZE - TILE_SIZE) { // Move right
-                npcVelocity = sf::Vector2f(npcSpeed, 0.f);
-                npcAnimationRow = 4;
-            }
-
-            npcMovementClock.restart(); // Reset the movement timer
-        }
-
-        npcPosition += npcVelocity * deltaTime.asSeconds();
-
-        // NPC animation
-        if (npcVelocity.x == 0.f && npcVelocity.y == 0.f) {
-            npcCurrentFrame = 0;
-        } else if (npcAnimationClock.getElapsedTime().asSeconds() > 0.15f) {
-            npcCurrentFrame = (npcCurrentFrame + 1) % 4;
+        // Update NPC animation (show only the current frame)
+        if (npcAnimationClock.getElapsedTime().asSeconds() > 0.15f) { // Adjust the timing as needed
+            npcCurrentFrame = (npcCurrentFrame + 1) % 4; // Cycle through frames
             npcAnimationClock.restart();
         }
 
-        sf::IntRect npcFrame(npcCurrentFrame * TILE_SIZE, (npcAnimationRow - 1) * TILE_SIZE, TILE_SIZE, TILE_SIZE);
-        npcSprite.setTextureRect(npcFrame);
+        // Update NPC movement
+        if (npcMovementClock.getElapsedTime().asSeconds() > npcMoveInterval) {
+            int randomDirection = rand() % 4; // 0 = up, 1 = down, 2 = left, 3 = right
+            float npcSpeed = 50.0f;
 
-        // Update game view
-        gameView.setCenter(playerPosition);
-        window.setView(gameView);
+            if (randomDirection == 0) {
+                npcVelocity = sf::Vector2f(0.f, -npcSpeed);
+                npcAnimationRow = 2;
+            } else if (randomDirection == 1) {
+                npcVelocity = sf::Vector2f(0.f, npcSpeed);
+                npcAnimationRow = 1;
+            } else if (randomDirection == 2) {
+                npcVelocity = sf::Vector2f(-npcSpeed, 0.f);
+                npcAnimationRow = 3;
+            } else {
+                npcVelocity = sf::Vector2f(npcSpeed, 0.f);
+                npcAnimationRow = 4;
+            }
+            npcMovementClock.restart();
+        }
+
+        npcPosition += npcVelocity * deltaTime.asSeconds();
 
         // Render the world
         window.clear();
         renderWorld(window, world, grassSprite, waterSprite);
 
         // Render the player
+        sf::IntRect playerFrame(playerCurrentFrame * TILE_SIZE, (playerAnimationRow - 1) * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+        playerSprite.setTextureRect(playerFrame);
         playerSprite.setPosition(playerPosition);
         window.draw(playerSprite);
 
         // Render the NPC
+        sf::IntRect npcFrame(npcCurrentFrame * TILE_SIZE, (npcAnimationRow - 1) * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+        npcSprite.setTextureRect(npcFrame);
         npcSprite.setPosition(npcPosition);
         window.draw(npcSprite);
+
+        // Render the football if it's being thrown
+        if (isThrowing) {
+            footballSprite.setPosition(footballPosition);
+            window.draw(footballSprite);
+        }
 
         // Render inventory
         drawInventory(window, hudView);
