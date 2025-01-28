@@ -1,7 +1,9 @@
 #include <SFML/Graphics.hpp>
+#include "bullet.hpp"
 #include <vector>
 #include <cstdlib>
 #include <ctime>
+#include <cmath>
 #include <iostream>
 
 // Constants for map dimensions and tile size
@@ -11,6 +13,9 @@ const int TILE_SIZE = 128; // Base tile size (128x128)
 
 // Tile types
 enum TileType { GRASS, WATER };
+
+// Container for active bullets
+std::vector<Bullet> bullets;
 
 // Function to generate the world map
 std::vector<std::vector<TileType>> generateWorld() {
@@ -57,7 +62,6 @@ const int inventoryPadding = 10;  // Padding between inventory boxes
 std::vector<sf::RectangleShape> inventory;
 
 void setupInventory() {
-    // Create inventory boxes
     for (int i = 0; i < inventoryColumns; ++i) {
         sf::RectangleShape box(sf::Vector2f(inventoryBoxSize, inventoryBoxSize));
         box.setPosition(inventoryPadding + i * (inventoryBoxSize + inventoryPadding),
@@ -75,7 +79,7 @@ void drawInventory(sf::RenderWindow& window, sf::View& hudView) {
 }
 
 int main() {
-    // Create the game window (resizeable)
+    // Create the game window (resizable)
     sf::RenderWindow window(sf::VideoMode(800, 600), "Player and NPC Animations", sf::Style::Resize);
 
     // Load textures for tiles and player/NPC
@@ -94,40 +98,35 @@ int main() {
 
     // Player setup
     sf::Sprite playerSprite(playerTexture);
-    playerSprite.setOrigin(TILE_SIZE / 2, TILE_SIZE / 2); // Set the origin to the center of the sprite
-    sf::Vector2f playerPosition(400.f, 300.f); // Initial player position (center of the window)
-    sf::Vector2f velocity(0.f, 0.f); // Initial velocity
-    float speed = 200.0f; // Movement speed
+    playerSprite.setOrigin(TILE_SIZE / 2, TILE_SIZE / 2); // Center origin
+    sf::Vector2f playerPosition(400.f, 300.f);           // Initial player position
+    sf::Vector2f velocity(0.f, 0.f);                     // Initial velocity
+    float speed = 200.0f;                                // Movement speed
 
     // NPC setup
     sf::Sprite npcSprite(npcTexture);
-    npcSprite.setOrigin(TILE_SIZE / 2, TILE_SIZE / 2); // Set the origin to the center of the sprite
-    sf::Vector2f npcPosition(100.f, 100.f); // Initial NPC position
-    sf::Vector2f npcVelocity(0.f, 0.f); // Initial NPC velocity
-    int npcCurrentFrame = 0;
-    int npcAnimationRow = 1;
+    npcSprite.setOrigin(TILE_SIZE / 2, TILE_SIZE / 2); // Center origin
+    sf::Vector2f npcPosition(100.f, 100.f);           // NPC position
+    sf::Vector2f npcVelocity(0.f, 0.f);              // NPC velocity
+    sf::Clock npcMovementClock, npcAnimationClock;   // Timers for NPC movement and animation
+    const float npcMoveInterval = 2.0f;              // Time between direction changes
+    int npcCurrentFrame = 0, npcAnimationRow = 1;    // NPC animation state
 
     // Animation setup
-    sf::Clock playerAnimationClock;
-    sf::Clock npcAnimationClock;
-    sf::Clock movementClock;
-    int playerCurrentFrame = 0;
-    int playerAnimationRow = 1;
+    sf::Clock playerAnimationClock, movementClock;
+    int playerCurrentFrame = 0, playerAnimationRow = 1;
 
     // Generate the world map
     std::vector<std::vector<TileType>> world = generateWorld();
 
-    // Create a view to control what part of the world is visible
-    sf::View gameView(sf::FloatRect(0, 0, 800, 600)); // Initial view size
-    sf::View hudView(sf::FloatRect(0, 0, 800, 600));  // HUD view for inventory
+    // Camera setup
+    sf::View gameView(sf::FloatRect(0, 0, 800, 600));
+    sf::View hudView(sf::FloatRect(0, 0, 800, 600));
 
     // Setup inventory
     setupInventory();
 
-    // Timer for NPC direction change
-    sf::Clock npcMovementClock;
-    const float npcMoveInterval = 2.0f; // Time in seconds between NPC direction changes
-
+    // Main game loop
     while (window.isOpen()) {
         sf::Event event;
         while (window.pollEvent(event)) {
@@ -136,35 +135,22 @@ int main() {
             }
         }
 
-        // Handle key press for player movement (WASD)
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::W)) {
-            velocity.y = -speed;
-            playerAnimationRow = 2;
-        } else if (sf::Keyboard::isKeyPressed(sf::Keyboard::S)) {
-            velocity.y = speed;
-            playerAnimationRow = 1;
-        } else {
-            velocity.y = 0.f;
-        }
+        // Update delta time
+        sf::Time deltaTime = movementClock.restart();
 
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::A)) {
-            velocity.x = -speed;
-            playerAnimationRow = 3;
-        } else if (sf::Keyboard::isKeyPressed(sf::Keyboard::D)) {
-            velocity.x = speed;
-            playerAnimationRow = 4;
-        } else {
-            velocity.x = 0.f;
-        }
+        // Player movement logic (WASD)
+        velocity = {0.f, 0.f};
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::W)) velocity.y = -speed, playerAnimationRow = 2;
+        else if (sf::Keyboard::isKeyPressed(sf::Keyboard::S)) velocity.y = speed, playerAnimationRow = 1;
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::A)) velocity.x = -speed, playerAnimationRow = 3;
+        else if (sf::Keyboard::isKeyPressed(sf::Keyboard::D)) velocity.x = speed, playerAnimationRow = 4;
 
         // Update player position
-        sf::Time deltaTime = movementClock.restart();
         playerPosition += velocity * deltaTime.asSeconds();
 
         // Player animation
-        if (velocity.x == 0.f && velocity.y == 0.f) {
-            playerCurrentFrame = 0;
-        } else if (playerAnimationClock.getElapsedTime().asSeconds() > 0.15f) {
+        if (velocity == sf::Vector2f(0.f, 0.f)) playerCurrentFrame = 0;
+        else if (playerAnimationClock.getElapsedTime().asSeconds() > 0.15f) {
             playerCurrentFrame = (playerCurrentFrame + 1) % 4;
             playerAnimationClock.restart();
         }
@@ -172,61 +158,74 @@ int main() {
         sf::IntRect playerFrame(playerCurrentFrame * TILE_SIZE, (playerAnimationRow - 1) * TILE_SIZE, TILE_SIZE, TILE_SIZE);
         playerSprite.setTextureRect(playerFrame);
 
-        // NPC movement logic: Move in a random direction at intervals
+        // NPC movement and animation logic
         if (npcMovementClock.getElapsedTime().asSeconds() > npcMoveInterval) {
-            // Choose a random direction for the NPC
-            int randomDirection = rand() % 4; // 0 = up, 1 = down, 2 = left, 3 = right
-            float npcSpeed = 50.0f; // NPC speed
+            int randomDirection = rand() % 4;
+            float npcSpeed = 50.0f;
 
-            if (randomDirection == 0 && npcPosition.y > 0) { // Move up
-                npcVelocity = sf::Vector2f(0.f, -npcSpeed);
-                npcAnimationRow = 2;
-            } else if (randomDirection == 1 && npcPosition.y < MAP_HEIGHT * TILE_SIZE - TILE_SIZE) { // Move down
-                npcVelocity = sf::Vector2f(0.f, npcSpeed);
-                npcAnimationRow = 1;
-            } else if (randomDirection == 2 && npcPosition.x > 0) { // Move left
-                npcVelocity = sf::Vector2f(-npcSpeed, 0.f);
-                npcAnimationRow = 3;
-            } else if (randomDirection == 3 && npcPosition.x < MAP_WIDTH * TILE_SIZE - TILE_SIZE) { // Move right
-                npcVelocity = sf::Vector2f(npcSpeed, 0.f);
-                npcAnimationRow = 4;
-            }
+            if (randomDirection == 0) npcVelocity = {0.f, -npcSpeed}, npcAnimationRow = 2;
+            else if (randomDirection == 1) npcVelocity = {0.f, npcSpeed}, npcAnimationRow = 1;
+            else if (randomDirection == 2) npcVelocity = {-npcSpeed, 0.f}, npcAnimationRow = 3;
+            else npcVelocity = {npcSpeed, 0.f}, npcAnimationRow = 4;
 
-            npcMovementClock.restart(); // Reset the movement timer
+            npcMovementClock.restart();
         }
 
         npcPosition += npcVelocity * deltaTime.asSeconds();
 
-        // NPC animation
-        if (npcVelocity.x == 0.f && npcVelocity.y == 0.f) {
-            npcCurrentFrame = 0;
-        } else if (npcAnimationClock.getElapsedTime().asSeconds() > 0.15f) {
+        if (npcVelocity != sf::Vector2f(0.f, 0.f) && npcAnimationClock.getElapsedTime().asSeconds() > 0.15f) {
             npcCurrentFrame = (npcCurrentFrame + 1) % 4;
             npcAnimationClock.restart();
-        }
+        } else if (npcVelocity == sf::Vector2f(0.f, 0.f)) npcCurrentFrame = 0;
 
         sf::IntRect npcFrame(npcCurrentFrame * TILE_SIZE, (npcAnimationRow - 1) * TILE_SIZE, TILE_SIZE, TILE_SIZE);
         npcSprite.setTextureRect(npcFrame);
+        npcSprite.setPosition(npcPosition);
 
-        // Update game view
+        // Handle shooting (Space key)
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Space)) {
+            static sf::Clock shootClock;
+            if (shootClock.getElapsedTime().asSeconds() > 0.2f) {
+                Bullet bullet;
+                bullet.shape.setPosition(playerPosition);
+
+                // Determine bullet direction based on player animation row
+                if (playerAnimationRow == 1)       // Down
+                    bullet.velocity = sf::Vector2f(0.f, 1.f);
+                else if (playerAnimationRow == 2)  // Up
+                    bullet.velocity = sf::Vector2f(0.f, -1.f);
+                else if (playerAnimationRow == 3)  // Left
+                    bullet.velocity = sf::Vector2f(-1.f, 0.f);
+                else if (playerAnimationRow == 4)  // Right
+                    bullet.velocity = sf::Vector2f(1.f, 0.f);
+
+                bullets.push_back(bullet);
+                shootClock.restart();
+            }
+        }
+
+        // Update bullets
+        for (size_t i = 0; i < bullets.size(); ++i) {
+            bullets[i].update(deltaTime.asSeconds());
+            if (bullets[i].shape.getPosition().x < 0 || bullets[i].shape.getPosition().x > MAP_WIDTH * TILE_SIZE ||
+                bullets[i].shape.getPosition().y < 0 || bullets[i].shape.getPosition().y > MAP_HEIGHT * TILE_SIZE) {
+                bullets.erase(bullets.begin() + i);
+                --i;
+            }
+        }
+
+        // Update camera
         gameView.setCenter(playerPosition);
         window.setView(gameView);
 
-        // Render the world
+        // Render everything
         window.clear();
         renderWorld(window, world, grassSprite, waterSprite);
-
-        // Render the player
         playerSprite.setPosition(playerPosition);
         window.draw(playerSprite);
-
-        // Render the NPC
-        npcSprite.setPosition(npcPosition);
         window.draw(npcSprite);
-
-        // Render inventory
+        for (const auto& bullet : bullets) window.draw(bullet.shape);
         drawInventory(window, hudView);
-
         window.display();
     }
 
