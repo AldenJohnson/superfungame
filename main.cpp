@@ -82,13 +82,13 @@ int main() {
     // Create the game window (resizable)
     sf::RenderWindow window(sf::VideoMode(800, 600), "Player and NPC Animations", sf::Style::Resize);
 
-    // Load textures for tiles and player/NPC
-    sf::Texture grassTexture, waterTexture, playerTexture, npcTexture;
-    if (!grassTexture.loadFromFile("grass.png") ||
-        !waterTexture.loadFromFile("water.png") ||
-        !playerTexture.loadFromFile("player_spritesheet.png") ||
-        !npcTexture.loadFromFile("npc_spritesheet.png")) { // NPC spritesheet
-        std::cerr << "Error: Failed to load textures." << std::endl;
+    // Load textures
+    sf::Texture grassTexture, waterTexture, playerTexture, npcTexture, footballTexture;
+    if (!grassTexture.loadFromFile("images/grass.png") ||
+        !waterTexture.loadFromFile("images/water.png") ||
+        !playerTexture.loadFromFile("images/player_spritesheet.png") ||
+        !npcTexture.loadFromFile("images/npc_spritesheet.png") ||
+        !footballTexture.loadFromFile("images/football.png")) {
         return -1;
     }
 
@@ -130,9 +130,8 @@ int main() {
     while (window.isOpen()) {
         sf::Event event;
         while (window.pollEvent(event)) {
-            if (event.type == sf::Event::Closed) {
+            if (event.type == sf::Event::Closed)
                 window.close();
-            }
         }
 
         // Update delta time

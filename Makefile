@@ -4,7 +4,7 @@ CXXFLAGS = -Isrc/include
 LDFLAGS = -Lsrc/lib -lsfml-graphics -lsfml-window -lsfml-system
 
 # Source files
-SOURCES = main.cpp bullet.cpp
+SOURCES = main.cpp bullet.cpp Items.cpp NPC.cpp World.cpp Player.cpp
 OBJECTS = $(SOURCES:.cpp=.o)
 
 # Output executable
