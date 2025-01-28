@@ -1,8 +1,8 @@
 #include <SFML/Graphics.hpp>
-#include "NPC.h"
+#include "NPC.hpp"
 #include "Player.hpp" // Include the new Player class
-#include "Items.h"
-#include "World.h"
+#include "Items.hpp"
+#include "World.hpp"
 
 int main() {
     sf::RenderWindow window(sf::VideoMode(800, 600), "Player and NPC Animations", sf::Style::Resize);
