@@ -3,20 +3,14 @@
 
 #include <SFML/Graphics.hpp>
 
-class Football {
+class Arrow {
 public:
-    Football(const sf::Texture& texture);
-    void update(sf::Time deltaTime);
-    void render(sf::RenderWindow& window);
-    void throwFootball(const sf::Vector2f& playerPosition, const sf::Vector2f& npcPosition);
-    bool isThrown() const;
-
-private:
-    sf::Sprite sprite;
-    sf::Vector2f position;
+    sf::CircleShape shape;
     sf::Vector2f velocity;
-    bool thrown;
-    sf::Clock throwTimer;
+    float speed;
+
+    Arrow(float radius = 5.0f); // Constructor
+    void update(float deltaTime); // Updates the arrow's position
 };
 
 #endif // ITEMS_H

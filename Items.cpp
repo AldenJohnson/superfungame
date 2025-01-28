@@ -1,35 +1,14 @@
-#include "Items.h"
+#include "Items.hpp"
 #include <cmath>
 
-Football::Football(const sf::Texture& texture)
-    : thrown(false) {
-    sprite.setTexture(texture);
-    sprite.setOrigin(texture.getSize().x / 2.f, texture.getSize().y / 2.f);
+Arrow::Arrow(float radius) : speed(500.0f) { // Default speed of the arrow
+    shape.setRadius(radius);
+    shape.setFillColor(sf::Color::Red); // Set arrow color to red
+    shape.setOrigin(radius, radius);   // Center the origin of the arrow
+    shape.setScale(2.f, 2.f); // Scale arrows (adjust as needed)
 }
 
-void Football::throwFootball(const sf::Vector2f& playerPosition, const sf::Vector2f& npcPosition) {
-    position = playerPosition;
-    sf::Vector2f direction = npcPosition - playerPosition;
-    float length = sqrt(direction.x * direction.x + direction.y * direction.y);
-    direction /= length;  // Normalize direction
-    velocity = direction * 300.f;  // Speed of throw
-    thrown = true;
-    throwTimer.restart();
-}
-
-void Football::update(sf::Time deltaTime) {
-    if (thrown) {
-        position += velocity * deltaTime.asSeconds();
-    }
-}
-
-void Football::render(sf::RenderWindow& window) {
-    if (thrown) {
-        sprite.setPosition(position);
-        window.draw(sprite);
-    }
-}
-
-bool Football::isThrown() const {
-    return thrown;
+void Arrow::update(float deltaTime) {
+    // Update the arrow's position based on its velocity
+    shape.move(velocity * speed * deltaTime);
 }

@@ -2,7 +2,7 @@
 #include <SFML/Graphics.hpp>
 
 Player::Player(const sf::Texture& texture, float speed)
-    : position(400.f, 300.f), velocity(0.f, 0.f), speed(speed), animationRow(0), currentFrame(0) { // Correct order
+    : position(400.f, 300.f), velocity(0.f, 0.f), speed(speed), animationRow(0), currentFrame(0) {
     sprite.setTexture(texture);
     sprite.setOrigin(64, 64); // Assuming 128x128 sprite size
     sprite.setPosition(position);
@@ -26,7 +26,7 @@ void Player::update(sf::Time deltaTime) {
 }
 
 void Player::render(sf::RenderWindow& window) {
-    window.draw(sprite);  // Draw the player sprite
+    window.draw(sprite); // Draw the player sprite
 }
 
 void Player::handleInput() {
@@ -53,4 +53,12 @@ void Player::handleInput() {
 
 sf::Sprite& Player::getSprite() {
     return sprite; // Provide access to the sprite
+}
+
+const sf::Vector2f& Player::getPosition() const {
+    return position; // Provide read-only access to the player's position
+}
+
+int Player::getAnimationRow() const {
+    return animationRow; // Provide read-only access to the current animation row
 }
